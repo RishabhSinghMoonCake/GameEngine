@@ -1,6 +1,9 @@
 #include <SDL3/SDl.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_image/SDL_image.h>
+#include <vector>
+#include <string>
+#include "animation.h"
 
 using namespace std;
 
@@ -15,6 +18,20 @@ struct SDLState
 void cleanUp(SDLState &state);
 
 bool initialize(SDLState& state);
+
+struct Resources
+{
+	const int ANIM_PLAYER_IDLE = 0; //index of idle animation
+	std::vector<Animation> playerAnims; //vector of player animations
+
+	std::vector<SDL_Texture*> textures; //vector of textures
+
+	void load(SDLState& state)
+	{
+		playerAnims.resize(5);
+		playerAnims[ANIM_PLAYER_IDLE] = Animation(8, 1.6f); //idle animation with 1 frame and 0.5 seconds length
+	}
+};
 
 int main(int argc, char *argv[])
 {
@@ -36,10 +53,24 @@ int main(int argc, char *argv[])
 	}
 	SDL_SetTextureScaleMode(idleTex, SDL_SCALEMODE_NEAREST); //set the scale mode for the texture
 
+
+	//setup game data
+	const bool* keys = SDL_GetKeyboardState(nullptr); //get the current keyboard state
+	float playerX = 0.0f; //player position on x-axis
+	float playerY = 0.0f; //player position on y-axis
+
+	const float floor = state.logH;
+	uint64_t prevTime = SDL_GetTicks(); //get the previous time in milliseconds
+
+	//variables
+	bool flipHorizontal = false;
+
 	//create the game main loop
 	bool running = true;
 	while (running)
 	{
+		uint64_t nowTime = SDL_GetTicks(); //get the current time in milliseconds
+		float deltaTime = (nowTime - prevTime) / 1000.0f; //calculate the time elapsed since the last frame in seconds
 		SDL_Event event{ 0 };
 		while (SDL_PollEvent(&event))
 		{
@@ -59,28 +90,48 @@ int main(int argc, char *argv[])
 			}
 		}
 		
+
+		//handle movement
+		float moveAmount = 0;
+		float playerXSpeed = 175.0f; //speed of the player on x-axis
+
+		if (keys[SDL_SCANCODE_A])
+		{
+			moveAmount += -playerXSpeed;
+			flipHorizontal = true; //flip the sprite horizontally when moving left
+		}
+		else if (keys[SDL_SCANCODE_D])
+		{
+			moveAmount += playerXSpeed;
+			flipHorizontal = false; //do not flip the sprite when moving right
+		}
+
+		playerX += moveAmount * deltaTime; //update the player position based on the time elapsed since the last frame
+		
 		//perform drawing commands
 		SDL_SetRenderDrawColor(state.renderer, 20, 20, 20, 255);
 		SDL_RenderClear(state.renderer);
 
+		const float spriteSize = 32.0f; //size of the sprite
+
 		SDL_FRect src{
 			.x = 0.0f,
 			.y = 0.0f,
-			.w = 32.0f,
-			.h = 32.0f
+			.w = spriteSize,
+			.h = spriteSize
 		};
 
 		SDL_FRect dst{
-			.x = 0.0f,
-			.y = 0.0f,
-			.w = 32.0f,
-			.h = 32.0f
+			.x = playerX,
+			.y = floor-spriteSize,
+			.w = spriteSize,
+			.h = spriteSize
 		};
 
-		SDL_RenderTexture(state.renderer, idleTex, &src, &dst); //draw the idle texture to the renderer
-
+		SDL_RenderTextureRotated(state.renderer, idleTex, &src, &dst, 0, nullptr, flipHorizontal ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 		//swap buffers and present
 		SDL_RenderPresent(state.renderer);
+		prevTime = nowTime; //update the previous time
 	}
 	SDL_DestroyTexture(idleTex); //clean up the texture 
 	cleanUp(state);
