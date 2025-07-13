@@ -3,9 +3,13 @@
 #include <SDL3_image/SDL_image.h>
 #include <vector>
 #include <string>
-#include "animation.h"
+#include "gameObject.h"
+#include <array>
+
+#include <glm/glm.hpp>
 
 using namespace std;
+
 
 
 
@@ -19,17 +23,47 @@ void cleanUp(SDLState &state);
 
 bool initialize(SDLState& state);
 
+const size_t LAYER_IDX_LEVEL = 0; //index of the level layer
+const size_t LAYER_IDX_CHARACTERS = 1; //index of the characters layer
+
+struct GameState
+{
+	std::array<std::vector<GameObject>, 2> layers; //array of layers, each layer is a vector of game objects
+};
+
 struct Resources
 {
 	const int ANIM_PLAYER_IDLE = 0; //index of idle animation
 	std::vector<Animation> playerAnims; //vector of player animations
 
 	std::vector<SDL_Texture*> textures; //vector of textures
+	SDL_Texture* idleTex; //texture for idle animation
+
+	SDL_Texture* loadTexture(SDL_Renderer *renderer, const std::string& path)
+	{
+		//load game assets
+		SDL_Texture* tex = IMG_LoadTexture(renderer, path.c_str()); //preload textures into gpu, [you can also use sdl_surface instead of texture to load into memory]
+
+		SDL_SetTextureScaleMode(tex, SDL_SCALEMODE_NEAREST); //set the scale mode for the texture
+		textures.push_back(tex); //add the texture to the vector of textures
+		return tex; //return the pointer to the texture
+	}
 
 	void load(SDLState& state)
 	{
 		playerAnims.resize(5);
 		playerAnims[ANIM_PLAYER_IDLE] = Animation(8, 1.6f); //idle animation with 1 frame and 0.5 seconds length
+
+		idleTex = loadTexture(state.renderer, "assets/idle.png"); //load the idle texture
+	}
+
+	void unload()
+	{
+		for (auto& tex : textures) //iterate through all the textures
+		{
+			SDL_DestroyTexture(tex); //destroy the texture
+		}
+		textures.clear(); //clear the vector of textures
 	}
 };
 
@@ -43,15 +77,11 @@ int main(int argc, char *argv[])
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", "Failed to initialize SDL", nullptr);
 		return 1;
 	}
-	//load game assets
-	SDL_Texture* idleTex = IMG_LoadTexture(state.renderer, "assets/idle.png"); //preload textures into gpu, [you can also use sdl_surface instead of texture to load into memory]
-	if (!idleTex)
-	{
-		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Error", "Failed to load idle texture", nullptr);
-		cleanUp(state);
-		return 1;
-	}
-	SDL_SetTextureScaleMode(idleTex, SDL_SCALEMODE_NEAREST); //set the scale mode for the texture
+	
+	//load the game resources
+	Resources res;
+	res.load(state); //load the resources
+
 
 
 	//setup game data
@@ -128,12 +158,12 @@ int main(int argc, char *argv[])
 			.h = spriteSize
 		};
 
-		SDL_RenderTextureRotated(state.renderer, idleTex, &src, &dst, 0, nullptr, flipHorizontal ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+		SDL_RenderTextureRotated(state.renderer, res.idleTex, &src, &dst, 0, nullptr, flipHorizontal ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
 		//swap buffers and present
 		SDL_RenderPresent(state.renderer);
 		prevTime = nowTime; //update the previous time
 	}
-	SDL_DestroyTexture(idleTex); //clean up the texture 
+	res.unload(); //clean up the texture 
 	cleanUp(state);
 	return 0;
 }
