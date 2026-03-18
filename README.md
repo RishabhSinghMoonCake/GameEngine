@@ -76,7 +76,7 @@ Even though incomplete, this project demonstrates:
 ## 👨‍💻 Developer
 
 **Rishabh Singh**
-CSE Undergraduate @ IIIT Guwahati
+CSE Undergraduate
 Aspiring Software Engineer | Indie Game Developer
 
 ---
